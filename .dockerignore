@@ -1,0 +1,6 @@
+__pycache__
+*.pyc
+test_*.py
+sonic_*.json
+.git
+switches_seed.db

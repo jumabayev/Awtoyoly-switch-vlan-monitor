@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Switch VLAN Monitor</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d1117;
+    --bg2: #161b22;
+    --bg3: #21262d;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text2: #8b949e;
+    --text3: #484f58;
+    --green: #3fb950;
+    --green-dim: #1a3622;
+    --amber: #d29922;
+    --amber-dim: #341a00;
+    --red: #f85149;
+    --blue: #58a6ff;
+    --blue-dim: #0d2850;
+    --purple: #bc8cff;
+    --teal: #39d353;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 28px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    width: 36px; height: 36px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    color: var(--green);
+  }
+
+  h1 { font-size: 18px; font-weight: 600; letter-spacing: -0.3px; }
+  .subtitle { font-size: 13px; color: var(--text2); }
+
+  .status-bar {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text2);
+  }
+
+  .pulse {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .main-grid {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+
+  .panel {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text2);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .panel-header .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--amber);
+  }
+
+  .panel-body { padding: 18px; }
+
+  .form-group { margin-bottom: 14px; }
+
+  label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text2);
+    margin-bottom: 6px;
+  }
+
+  input, select {
+    width: 100%;
+    padding: 9px 12px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  input:focus, select:focus { border-color: var(--blue); }
+  input::placeholder { color: var(--text3); }
+
+  .btn {
+    width: 100%;
+    padding: 10px;
+    background: var(--blue);
+    color: #0d1117;
+    border: none;
+    border-radius: 8px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+    margin-top: 6px;
+  }
+
+  .btn:hover { opacity: 0.85; }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-refresh {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    cursor: pointer;
+    margin-left: auto;
+  }
+  .btn-refresh:hover { border-color: var(--blue); color: var(--blue); }
+
+  .switch-list {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .switch-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    font-size: 13px;
+  }
+
+  .switch-item:hover { border-color: var(--blue); }
+  .switch-item.active { border-color: var(--blue); background: var(--blue-dim); }
+
+  .switch-item .sw-status {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .sw-status.online { background: var(--green); }
+  .sw-status.loading { background: var(--amber); animation: pulse 1s infinite; }
+  .sw-status.error { background: var(--red); }
+
+  .sw-info { flex: 1; min-width: 0; }
+  .sw-ip { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 500; }
+  .sw-name { font-size: 11px; color: var(--text2); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .remove-btn {
+    background: none; border: none; color: var(--text3); cursor: pointer;
+    font-size: 16px; padding: 0 2px; line-height: 1; transition: color 0.15s;
+  }
+  .remove-btn:hover { color: var(--red); }
+
+  .right-panel { display: flex; flex-direction: column; gap: 20px; }
+
+  .empty-state { padding: 60px 24px; text-align: center; color: var(--text3); }
+  .empty-icon { font-size: 40px; margin-bottom: 12px; }
+  .empty-text { font-size: 14px; }
+
+  .chassis {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .chassis::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--blue) 0%, transparent 100%);
+  }
+
+  .chassis-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  .chassis-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--green);
+  }
+
+  .chassis-model {
+    font-size: 11px;
+    color: var(--text2);
+    margin-top: 2px;
+  }
+
+  .chassis-meta {
+    margin-left: auto;
+    display: flex;
+    gap: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text2);
+    text-align: right;
+  }
+
+  .meta-val { color: var(--text); font-weight: 600; display: block; font-size: 13px; }
+
+  .port-section-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text3);
+    margin-bottom: 8px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .port-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 16px;
+    padding: 12px;
+    background: #13171d;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+
+  .port-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    cursor: pointer;
+    width: 28px;
+  }
+
+  .port {
+    width: 24px;
+    height: 20px;
+    border-radius: 3px;
+    border: 1.5px solid transparent;
+    position: relative;
+    transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .port:hover { transform: scale(1.2); border-color: rgba(255,255,255,0.4) !important; box-shadow: 0 0 8px rgba(255,255,255,0.1); }
+  .port.selected { border-color: white !important; box-shadow: 0 0 12px rgba(88,166,255,0.4); }
+
+  .port.inactive { background: #1c2128; border-color: #262c35; }
+  .port.active { border-color: rgba(255,255,255,0.12); }
+
+  .port-led {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    position: absolute;
+    top: 1px;
+    right: 1px;
+  }
+
+  .port-led.blink { animation: pulse 1.5s infinite; }
+
+  .port-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    color: var(--text3);
+    line-height: 1;
+    font-weight: 500;
+  }
+
+  .port-wrap:hover .port-num { color: var(--text); }
+
+  .vlan-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .vlan-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    border: 1px solid var(--border);
+    background: var(--bg3);
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+
+  .vlan-badge.dimmed { opacity: 0.3; }
+
+  .vlan-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .port-detail {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    display: none;
+  }
+
+  .port-detail.visible { display: block; }
+
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 12px;
+  }
+
+  .detail-item label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text3);
+    margin-bottom: 4px;
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .detail-val {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .detail-val.online { color: var(--green); }
+  .detail-val.offline { color: var(--text3); }
+
+  .log-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text2);
+    height: 120px;
+    overflow-y: auto;
+    margin-top: 12px;
+  }
+
+  .log-line { line-height: 1.7; }
+  .log-line.ok { color: var(--green); }
+  .log-line.err { color: var(--red); }
+  .log-line.info { color: var(--blue); }
+  .log-line.warn { color: var(--amber); }
+
+  .spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid var(--border);
+    border-top-color: var(--blue);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .stat-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+
+  .stat-label {
+    font-size: 11px;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-bottom: 4px;
+  }
+
+  .stat-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 22px;
+    font-weight: 600;
+  }
+
+  .scanning-overlay {
+    display: none;
+    position: absolute;
+    inset: 0;
+    background: rgba(13,17,23,0.8);
+    border-radius: 12px;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+    z-index: 10;
+  }
+  .scanning-overlay.visible { display: flex; }
+  .scan-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--blue);
+  }
+
+  .scan-bar {
+    width: 200px;
+    height: 2px;
+    background: var(--border);
+    border-radius: 1px;
+    overflow: hidden;
+  }
+  .scan-bar-inner {
+    height: 100%;
+    background: var(--blue);
+    width: 0%;
+    animation: scan 3s ease-in-out;
+  }
+  @keyframes scan { from { width: 0%; } to { width: 100%; } }
+
+  @media (max-width: 900px) {
+    .main-grid { grid-template-columns: 1fr; }
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+    .port-grid { grid-template-columns: repeat(12, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">SW</div>
+  <div>
+    <h1>Switch VLAN Monitor</h1>
+    <div class="subtitle">Merkez ofis &mdash; port & VLAN izleme</div>
+  </div>
+  <div class="status-bar">
+    <div class="pulse"></div>
+    <span id="clock">--:--:--</span>
+  </div>
+</header>
+
+<div class="main-grid">
+  <div>
+    <div class="panel">
+      <div class="panel-header">
+        <div class="dot"></div>
+        Switch Ekle
+      </div>
+      <div class="panel-body">
+        <div class="form-group">
+          <label>IP Adresi</label>
+          <input type="text" id="inp-ip" placeholder="172.20.10.249" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label>Kullanici Adi</label>
+          <input type="text" id="inp-user" placeholder="admin" value="admin" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label>Sifre</label>
+          <input type="password" id="inp-pass" placeholder="********">
+        </div>
+        <div class="form-group">
+          <label>Model / Tip</label>
+          <select id="inp-model">
+            <option value="">Otomatik Algilama</option>
+            <option value="hp_comware">HP / H3C Comware</option>
+            <option value="edgecore">Edge-Core ECS</option>
+            <option value="cisco">Cisco IOS</option>
+          </select>
+        </div>
+        <button class="btn" id="add-btn" onclick="addSwitch()">Baglan & Tara</button>
+        <div class="switch-list" id="switch-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="right-panel" id="right-panel">
+    <div id="empty-state" class="empty-state">
+      <div class="empty-icon">&#x2B21;</div>
+      <div class="empty-text">Sol panelden bir switch ekleyin</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const VLAN_COLORS = [
+  '#58a6ff','#3fb950','#f0883e','#bc8cff',
+  '#ff7b72','#ffa657','#79c0ff','#39d353',
+  '#d2a8ff','#ffa198','#56d364','#e3b341',
+  '#f778ba','#a371f7','#7ee787','#cea5fb',
+  '#fdac54','#82b1ff','#ff9e80','#69f0ae',
+  '#ea80fc','#ffab91','#80cbc4','#ef5350',
+  '#42a5f5','#66bb6a','#ffa726','#ab47bc',
+  '#26c6da','#ec407a','#8d6e63','#78909c'
+];
+
+let switches = [];
+let activeIdx = null;
+let hiddenVlans = new Set();
+let selectedPort = null;
+
+function tick() {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString('tr-TR');
+}
+setInterval(tick, 1000); tick();
+
+// Load saved switches on page load
+async function loadSavedSwitches() {
+  try {
+    const resp = await fetch('/api/switches');
+    const saved = await resp.json();
+    saved.forEach(s => {
+      const sw = {
+        ip: s.ip, username: s.username, password: s.password, model: s.model,
+        status: 'online', hostname: s.hostname || s.ip,
+        ...s.data,
+        lastScan: s.last_scan
+      };
+      switches.push(sw);
+    });
+    if (switches.length > 0) {
+      activeIdx = 0;
+      renderSwitchList();
+      renderRight();
+    }
+  } catch(e) { console.log('No saved switches'); }
+}
+loadSavedSwitches();
+
+function renderSwitchList() {
+  const el = document.getElementById('switch-list');
+  el.innerHTML = switches.map((sw, i) => `
+    <div class="switch-item ${activeIdx === i ? 'active' : ''}" onclick="selectSwitch(${i})">
+      <div class="sw-status ${sw.status}"></div>
+      <div class="sw-info">
+        <div class="sw-ip">${sw.ip}</div>
+        <div class="sw-name">${sw.hostname || sw.model || 'Baglaniliyor...'}</div>
+      </div>
+      <button class="remove-btn" onclick="event.stopPropagation(); removeSwitch(${i})" title="Kaldir">&times;</button>
+    </div>
+  `).join('');
+}
+
+async function removeSwitch(i) {
+  const ip = switches[i].ip;
+  switches.splice(i, 1);
+  if (activeIdx === i) activeIdx = switches.length > 0 ? 0 : null;
+  else if (activeIdx > i) activeIdx--;
+  renderSwitchList();
+  renderRight();
+  try { await fetch('/api/switches/' + encodeURIComponent(ip), { method: 'DELETE' }); } catch(e) {}
+}
+
+function selectSwitch(i) {
+  activeIdx = i;
+  selectedPort = null;
+  hiddenVlans = new Set();
+  renderSwitchList();
+  renderRight();
+}
+
+async function addSwitch() {
+  const ip = document.getElementById('inp-ip').value.trim();
+  const user = document.getElementById('inp-user').value.trim();
+  const pass = document.getElementById('inp-pass').value.trim();
+  const model = document.getElementById('inp-model').value.trim();
+
+  if (!ip) { alert('IP adresi gerekli'); return; }
+
+  const btn = document.getElementById('add-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Taranıyor...';
+
+  const sw = { ip, username: user, password: pass, model, status: 'loading', ports: [], vlans: {}, hostname: '', logs: [] };
+  switches.push(sw);
+  activeIdx = switches.length - 1;
+  renderSwitchList();
+  renderRight();
+
+  try {
+    const resp = await fetch('/api/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ip, username: user, password: pass, model })
+    });
+
+    const data = await resp.json();
+
+    if (resp.ok) {
+      sw.status = 'online';
+      sw.hostname = data.hostname;
+      sw.model = data.model;
+      sw.ports = data.ports;
+      sw.vlans = data.vlans;
+      sw.uptime = data.uptime;
+      sw.logs = data.logs || [];
+    } else {
+      sw.status = 'error';
+      sw.hostname = data.hostname || ip;
+      sw.logs = data.logs || [{ type: 'err', msg: data.error || 'Baglanti basarisiz' }];
+    }
+  } catch(e) {
+    sw.status = 'error';
+    sw.logs = [{ type: 'err', msg: 'Sunucu hatasi: ' + e.message }];
+  }
+
+  renderSwitchList();
+  renderRight();
+  btn.disabled = false;
+  btn.textContent = 'Baglan & Tara';
+}
+
+async function refreshSwitch(idx) {
+  const sw = switches[idx];
+  sw.status = 'loading';
+  renderSwitchList();
+  renderRight();
+
+  try {
+    const resp = await fetch('/api/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ip: sw.ip, username: sw.username, password: sw.password, model: sw.model })
+    });
+
+    const data = await resp.json();
+    if (resp.ok) {
+      sw.status = 'online';
+      sw.hostname = data.hostname;
+      sw.model = data.model;
+      sw.ports = data.ports;
+      sw.vlans = data.vlans;
+      sw.uptime = data.uptime;
+      sw.logs = data.logs || [];
+      sw.logs.push({ type: 'ok', msg: 'Yenileme basarili' });
+    } else {
+      sw.status = 'error';
+      sw.logs = data.logs || [{ type: 'err', msg: data.error }];
+    }
+  } catch(e) {
+    sw.status = 'error';
+    sw.logs = [{ type: 'err', msg: 'Yenileme hatasi: ' + e.message }];
+  }
+
+  renderSwitchList();
+  renderRight();
+}
+
+function getVlanColor(vlan, vlans) {
+  if (!vlan) return '#444';
+  const keys = Object.keys(vlans);
+  const idx = keys.indexOf(String(vlan));
+  if (idx === -1) return '#444';
+  return VLAN_COLORS[idx % VLAN_COLORS.length];
+}
+
+function renderRight() {
+  const container = document.getElementById('right-panel');
+
+  if (activeIdx === null || switches.length === 0) {
+    container.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">&#x2B21;</div>
+      <div class="empty-text">Sol panelden bir switch ekleyin</div>
+    </div>`;
+    return;
+  }
+
+  const sw = switches[activeIdx];
+
+  if (sw.status === 'loading') {
+    container.innerHTML = `<div class="chassis" style="min-height:200px;">
+      <div class="scanning-overlay visible">
+        <div class="spinner"></div>
+        <div class="scan-text">${sw.ip} taranıyor...</div>
+        <div class="scan-bar"><div class="scan-bar-inner"></div></div>
+      </div>
+    </div>`;
+    return;
+  }
+
+  if (sw.status === 'error') {
+    container.innerHTML = `<div class="chassis"><div style="padding:20px; color:var(--red); font-family:'JetBrains Mono',monospace; font-size:13px;">
+      &#x2717; ${sw.ip} &mdash; Baglanti basarisiz<br><br>
+      ${(sw.logs||[]).map(l=>`<div class="log-line ${l.type}">${l.msg}</div>`).join('')}
+      <br><button class="btn" style="width:auto;padding:8px 20px;" onclick="refreshSwitch(${activeIdx})">Tekrar Dene</button>
+    </div></div>`;
+    return;
+  }
+
+  const ports = sw.ports || [];
+  const vlans = sw.vlans || {};
+  const activePorts = ports.filter(p => p.status === 'active').length;
+  const inactivePorts = ports.length - activePorts;
+  const trunkPorts = ports.filter(p => p.vlan === 'trunk' || p.mode === 'trunk').length;
+  const vlanKeys = Object.keys(vlans);
+
+  // Stats
+  let statsHtml = `<div class="stats-row">
+    <div class="stat-card"><div class="stat-label">Toplam Port</div><div class="stat-val" style="color:var(--blue)">${ports.length}</div></div>
+    <div class="stat-card"><div class="stat-label">Aktif</div><div class="stat-val" style="color:var(--green)">${activePorts}</div></div>
+    <div class="stat-card"><div class="stat-label">Pasif</div><div class="stat-val" style="color:var(--text3)">${inactivePorts}</div></div>
+    <div class="stat-card"><div class="stat-label">VLAN</div><div class="stat-val" style="color:var(--amber)">${vlanKeys.length}</div></div>
+  </div>`;
+
+  // Chassis - real switch layout (odd ports top, even ports bottom)
+  let portRows = '';
+
+  // Split into odd (top row) and even (bottom row) like real switch
+  const oddPorts = ports.filter((p, i) => i % 2 === 0); // 1,3,5,7...
+  const evenPorts = ports.filter((p, i) => i % 2 === 1); // 2,4,6,8...
+
+  const renderPortRow = (rowPorts, label) => {
+    let html = `<div class="port-section-label">${label}</div><div class="port-grid">`;
+    rowPorts.forEach(p => {
+      const idx = ports.indexOf(p);
+      const color = p.status === 'active' ? getVlanColor(p.vlan, vlans) : '#1c2128';
+      const ledColor = p.status === 'active' ? (p.mode === 'trunk' ? '#f0883e' : getVlanColor(p.vlan, vlans)) : '#1a2130';
+      const isHidden = hiddenVlans.has(String(p.vlan)) || (p.mode === 'trunk' && hiddenVlans.has('trunk'));
+      const opacity = isHidden ? '0.15' : '1';
+      const ledClass = p.status === 'active' ? 'blink' : '';
+      const macCount = (p.macs || []).length;
+      const macBadge = macCount > 0 ? `<div style="font-size:7px;color:var(--text2);font-family:'JetBrains Mono',monospace;">${macCount}m</div>` : '';
+      html += `
+        <div class="port-wrap" onclick="selectPort(${idx})" title="${p.name} | ${p.desc||'-'} | VLAN ${p.vlan} (${vlans[p.vlan]||'?'}) | ${p.mode} | ${macCount} MAC">
+          <div class="port ${p.status} ${selectedPort === idx ? 'selected' : ''}" style="background:${color}; opacity:${opacity};">
+            <div class="port-led ${ledClass}" style="background:${ledColor}; opacity:${opacity};"></div>
+          </div>
+          <div class="port-num">${p.num}</div>
+          ${macBadge}
+        </div>`;
+    });
+    html += '</div>';
+    return html;
+  };
+
+  portRows = renderPortRow(oddPorts, 'ROW 1 (1, 3, 5, 7 ...)');
+  portRows += renderPortRow(evenPorts, 'ROW 2 (2, 4, 6, 8 ...)');
+
+  // VLAN legend - show only VLANs that have ports assigned
+  let legendHtml = '<div class="vlan-legend">';
+  const usedVlans = new Set(ports.map(p => String(p.vlan)));
+  vlanKeys.forEach(k => {
+    if (!usedVlans.has(k)) return;
+    const color = getVlanColor(k, vlans);
+    const count = ports.filter(p => String(p.vlan) === k).length;
+    const accessCount = ports.filter(p => String(p.vlan) === k && p.mode === 'access').length;
+    const trunkCount = ports.filter(p => String(p.vlan) === k && p.mode === 'trunk').length;
+    let detail = `${count}`;
+    if (trunkCount > 0 && accessCount > 0) detail = `${accessCount}A/${trunkCount}T`;
+    else if (trunkCount > 0) detail = `${trunkCount}T`;
+
+    legendHtml += `<div class="vlan-badge ${hiddenVlans.has(k) ? 'dimmed':''}" onclick="toggleVlan('${k}')">
+      <div class="vlan-dot" style="background:${color}"></div>VLAN ${k} &mdash; ${vlans[k]} (${detail})
+    </div>`;
+  });
+  legendHtml += '</div>';
+
+  // Port detail
+  let detailHtml = '';
+  if (selectedPort !== null && ports[selectedPort]) {
+    const p = ports[selectedPort];
+    const pcolor = getVlanColor(p.vlan, vlans);
+    const macs = p.macs || [];
+    const txB = p.tx_bytes || 0;
+    const rxB = p.rx_bytes || 0;
+    const fmtBytes = (b) => {
+      if (b > 1e9) return (b/1e9).toFixed(1) + ' GB';
+      if (b > 1e6) return (b/1e6).toFixed(1) + ' MB';
+      if (b > 1e3) return (b/1e3).toFixed(1) + ' KB';
+      return b + ' B';
+    };
+
+    let macHtml = `<div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px;">
+      <label>Bagli Cihazlar &mdash; MAC / IP (${macs.length})</label>`;
+    if (macs.length > 0) {
+      macHtml += `<div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;max-height:150px;overflow-y:auto;font-size:11px;">
+        <div style="display:grid;grid-template-columns:140px 110px 150px 40px;gap:6px;line-height:1.6;color:var(--text3);margin-bottom:4px;font-weight:600;font-size:10px;">
+          <span>MAC</span><span>IP</span><span>HOSTNAME</span><span>VLAN</span>
+        </div>
+        ${macs.map(m => `<div style="display:grid;grid-template-columns:140px 110px 150px 40px;gap:6px;line-height:1.8;">
+          <span style="color:var(--blue)">${m.mac}</span>
+          <span style="color:${m.ip ? 'var(--green)' : 'var(--text3)'}; font-weight:${m.ip?'600':'400'}">${m.ip || '&mdash;'}</span>
+          <span style="color:var(--purple);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${m.hostname||m.vendor||''}">${m.hostname || m.vendor || '&mdash;'}</span>
+          <span style="color:var(--text2)">V${m.vlan}</span>
+        </div>`).join('')}
+      </div>`;
+    } else {
+      macHtml += `<div style="color:var(--text3);font-size:12px;padding:8px;">Bu portta bagli cihaz yok</div>`;
+    }
+    macHtml += '</div>';
+
+    detailHtml = `<div class="port-detail visible">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px;">
+        <div style="width:12px;height:12px;border-radius:3px;background:${pcolor};flex-shrink:0;"></div>
+        <div style="font-size:14px;font-weight:600;">${p.name} &mdash; Port ${p.num}</div>
+        <div style="margin-left:auto; font-size:11px; padding:3px 10px; border-radius:10px; background:${p.status==='active'?'var(--green-dim)':'var(--bg3)'}; color:${p.status==='active'?'var(--green)':'var(--text2)'};">${p.status === 'active' ? 'UP' : 'DOWN'}</div>
+      </div>
+      <div style="color:var(--text2); font-size:12px; margin-bottom:12px;">${p.desc || '&mdash;'}</div>
+      <div class="detail-grid">
+        <div class="detail-item"><label>Native VLAN</label><div class="detail-val" style="color:${pcolor}">VLAN ${p.vlan} (${vlans[p.vlan]||'?'})</div></div>
+        <div class="detail-item"><label>Mod</label><div class="detail-val" style="color:${p.mode==='trunk'?'var(--amber)':'var(--green)'}">${(p.mode||'access').toUpperCase()}</div></div>
+        <div class="detail-item"><label>Hiz</label><div class="detail-val">${p.speed ? p.speed+'Mbps' : '&mdash;'}</div></div>
+        <div class="detail-item"><label>Duplex</label><div class="detail-val">${(p.duplex||'auto').toUpperCase()}</div></div>
+        <div class="detail-item"><label>TX</label><div class="detail-val" style="color:var(--green)">&uarr; ${fmtBytes(txB)}</div></div>
+        <div class="detail-item"><label>RX</label><div class="detail-val" style="color:var(--blue)">&darr; ${fmtBytes(rxB)}</div></div>
+      </div>
+      ${macHtml}
+    </div>`;
+  }
+
+  // Logs
+  const logLines = (sw.logs || []).map(l =>
+    `<div class="log-line ${l.type}">[${new Date().toLocaleTimeString('tr-TR')}] ${l.msg}</div>`
+  ).join('');
+
+  container.innerHTML = statsHtml + `
+    <div class="chassis">
+      <div class="chassis-header">
+        <div>
+          <div class="chassis-name">${sw.hostname || sw.ip}</div>
+          <div class="chassis-model">${sw.model || '&mdash;'} &middot; ${sw.ip} &middot; Uptime: ${sw.uptime || '&mdash;'}</div>
+        </div>
+        <div class="chassis-meta">
+          <div><span class="meta-val" style="color:var(--green)">${activePorts}</span>aktif</div>
+          <div><span class="meta-val" style="color:var(--text3)">${inactivePorts}</span>pasif</div>
+        </div>
+        <button class="btn-refresh" onclick="refreshSwitch(${activeIdx})">&#x21bb; Yenile</button>
+      </div>
+      ${portRows}
+      <div style="margin-top:12px;">
+        <div class="port-section-label" style="margin-bottom:6px;">VLAN Haritasi &mdash; Filtrelemek icin tiklayin</div>
+        ${legendHtml}
+      </div>
+    </div>
+    ${detailHtml}
+    <div class="panel">
+      <div class="panel-header"><div class="dot" style="background:var(--green)"></div>Baglanti Logu</div>
+      <div class="log-box" id="log-box">${logLines}</div>
+    </div>
+  `;
+
+  const lb = document.getElementById('log-box');
+  if (lb) lb.scrollTop = lb.scrollHeight;
+}
+
+function selectPort(i) {
+  selectedPort = selectedPort === i ? null : i;
+  renderRight();
+}
+
+function toggleVlan(vlan) {
+  if (hiddenVlans.has(vlan)) hiddenVlans.delete(vlan);
+  else hiddenVlans.add(vlan);
+  renderRight();
+}
+</script>
+</body>
+</html>
